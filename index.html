@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>발전기: 회전하는 사각 도선과 유도 전류</title>
+  <style>
+    :root { --ink:#142238; --muted:#60718a; --line:#dae5f0; --bg:#eef3f9; --teal:#008f81; --blue:#3167d8; --orange:#db8728; }
+    * {box-sizing:border-box}
+    html,body { margin:0; min-height:100%; }
+    body { color:var(--ink); font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif; background:var(--bg); }
+    .app { display:flex; flex-direction:column; height:100dvh; min-height:720px; }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 19px 10px; background:white; border-bottom:1px solid var(--line); }
+    h1 {font-size:20px;letter-spacing:-.6px;margin:0 0 4px;font-weight:800}
+    header p {font-size:12px;line-height:1.4;color:var(--muted);margin:0}
+    .tag {font-size:11px;background:#e8f7f3;color:#117969;border-radius:99px;padding:7px 11px;font-weight:750;white-space:nowrap}
+    .toolbar {display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;padding:8px 13px;border-bottom:1px solid var(--line)}
+    .toolbar button {border:0;border-radius:9px;background:#1466d4;color:white;font-size:13px;font-weight:800;padding:8px 11px;cursor:pointer}
+    .toolbar button.secondary {background:#e7eff8;color:#234b77}
+    .tool {display:flex;gap:6px;align-items:center;flex-wrap:nowrap;font-size:12px;color:#42556d}
+    .tool b {white-space:nowrap}
+    .tool input[type=range] {width:106px; accent-color:#1466d4;cursor:pointer}
+    #angleSlider {width:157px}
+    .val {font-weight:800;min-width:34px;color:#1466d4;font-variant-numeric:tabular-nums}
+    select {background:#f4f8fd;border:1px solid #cfdcea;border-radius:8px;padding:6px 7px;font-size:12px;color:#304967}
+    .statistics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:9px 13px 0}
+    .stat {padding:8px 11px;background:#fff;border:1px solid var(--line);border-radius:10px;min-width:0}
+    .stat small {font-size:11px;color:var(--muted);display:block;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .stat strong {font-size:18px;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+    .stat:nth-child(2) strong {color:var(--blue)}
+    .stat:nth-child(3) strong {color:var(--teal)}
+    .stat:nth-child(4) strong {color:#bc6613}
+    .dashboard {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:11px;padding:11px 13px 13px;flex:1;min-height:0}
+    .panel {position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:9px 11px 10px;min-width:0;min-height:0;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(28,55,100,.035)}
+    .panel-heading {display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;min-height:25px;padding:1px 4px 6px}
+    .panel-heading strong {font-size:14px}
+    .panel-heading span {font-size:11px;color:#71839a}
+    .canvas-holder {position:relative;flex:1;min-height:0;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#fcfeff,#f7faff)}
+    canvas {width:100%;height:100%;display:block}
+    .foot {padding:5px 14px 9px;font-size:11px;color:#62738b;text-align:center}
+    .graph-switches {display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:1px 3px 6px;}
+    .graph-switch {display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 9px;border-radius:7px;font:700 11px inherit;background:#fff;border:1px solid #cbd6e5;color:#52637b;transition:background .12s,opacity .12s;}
+    .graph-switch .swatch {display:inline-block;width:15px;height:3px;border-radius:3px;background:var(--series-color);opacity:.3}
+    .graph-switch.active {background:var(--tint);border-color:var(--series-color);color:var(--ink)}
+    .graph-switch.active .swatch {opacity:1}
+    .graph-switch:focus-visible {outline:3px solid #8badf1;outline-offset:2px}
+    .switch-note {font-size:10px;color:#697c91}
+
+    @media (max-width:840px) {
+      .app {height:auto;min-height:100dvh}
+      .statistics {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .dashboard {grid-template-columns:1fr;grid-template-rows:repeat(4,310px);flex:none}
+      .toolbar {gap:10px}
+      .panel {height:310px}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>회전하는 사각 도선과 유도 전류</h1>
+      <p>자기장 속 도선의 회전 → 자기장에 수직한 투영 면적 변화 → 자기선속 변화 → 유도 전류</p>
+    </div>
+    <div class="tag">수업용 시각화 · 상대값</div>
+  </header>
+
+  <div class="toolbar">
+    <button type="button" id="playBtn">❚❚ 일시정지</button>
+    <button type="button" class="secondary" id="resetBtn">↺ 처음으로</button>
+    <button type="button" class="secondary" id="step45Btn" title="현재 위치에서 45° 더 회전하고 정지">↻ +45° 회전</button>
+    <label class="tool"><b>회전 속도</b><input id="speedSlider" type="range" min="0.2" max="2" step="0.1" value="1"><span id="speedText" class="val">1.0배</span></label>
+    <label class="tool"><b>회전 각도</b><input id="angleSlider" type="range" min="0" max="360" step="1" value="0"><span id="angleText" class="val">0°</span></label>
+    <label class="tool"><b>회전 시작 기준</b><select id="conventionMode"><option value="plane">도선 면 ∥ 자기장 · θ=0° (sin)</option><option value="normal">도선 면 ⟂ 자기장 · α=0° (cos)</option></select></label>
+    <label class="tool"><b>면적 그래프</b><select id="areaMode"><option value="signed">방향 포함</option><option value="abs">크기만 (절댓값)</option></select></label>
+  </div>
+
+  <section class="statistics" aria-label="현재 상태">
+    <div class="stat"><small id="angleCaption">도선 면 기준 회전각 θ</small><strong id="angleValue">0°</strong></div>
+    <div class="stat"><small id="areaCaption">실제 투영 면적 비율 |sinθ|</small><strong id="areaValue">0%</strong></div>
+    <div class="stat"><small>자기선속 최대값 대비 비율 sinθ</small><strong id="fluxValue">0%</strong></div>
+    <div class="stat"><small>유도 전류의 상대값 (방향 포함)</small><strong id="currentValue">-0.84</strong></div>
+  </section>
+
+  <main class="dashboard">
+    <section class="panel">
+      <div class="panel-heading"><strong>① 자석 사이의 사각 도선</strong><span>회전축에서 수평으로 왼쪽 15° 이동 · 카메라 높이 변화 없음</span></div>
+      <div class="canvas-holder"><canvas id="mainCanvas" aria-label="회전축 방향에서 바라본 사각 도선의 회전"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><strong>② 자기장 방향에서 본 모습</strong><span>1번과 같은 정사각형 도선 · 회전축은 가로 방향</span></div>
+      <div class="canvas-holder"><canvas id="projectionCanvas" aria-label="자기장 방향에서 바라본 투영 면적"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><strong>③ 유도 전류의 변화</strong><span id="currentHint">I ∝ −ωcosθ · 저항 일정 · 방향 포함</span></div>
+      <div class="canvas-holder"><canvas id="currentCanvas" aria-label="시간에 따른 유도 전류의 사인 곡선"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="panel-heading"><strong>④ 자기선속과 변화율 비교</strong><span id="graphHint">기존 시간 T/4에서 시작 · 투영 면적과 자기선속 구분</span></div>
+      <div class="graph-switches" role="group" aria-label="4번 그래프 곡선 표시 전환">
+        <button type="button" class="graph-switch active" id="toggleCos" aria-pressed="true" style="--series-color:#008e83;--tint:#ebf8f5"><span class="swatch"></span><span id="cosLegend">sinθ</span> <span id="cosStatus">ON</span></button>
+        <button type="button" class="graph-switch active" id="toggleDerivative" aria-pressed="true" style="--series-color:#9460d3;--tint:#f5efff"><span class="swatch"></span><span id="derivativeLegend">d(sinθ)/dt</span> <span id="derivativeStatus">ON</span></button>
+        <span class="switch-note">클릭해 각 곡선을 숨기거나 표시</span>
+      </div>
+      <div class="canvas-holder"><canvas id="areaCanvas" aria-label="코사인 함수와 시간 미분 그래프를 함께 나타낸 그래프"></canvas></div>
+    </section>
+  </main>
+  <div class="foot" id="footerText">x: 회전축 · y: 자기장 · z: 나머지 수직 방향 | 도선 면 기준 θ=0°는 면이 자기장과 평행한 상태 · Φ/BA=sinθ · I∝−dΦ/dt (저항 일정, 자체 유도 무시)</div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const canvases = ['mainCanvas','projectionCanvas','currentCanvas','areaCanvas'].map($);
+const C = Object.fromEntries(canvases.map(c => [c.id,c.getContext('2d')]));
+const TAU = Math.PI*2;
+const color = {ink:'#21364f',muted:'#62758c',grid:'#dde7f1',blue:'#3167d8',teal:'#008e83',orange:'#e4902b',red:'#d84b4b'};
+let theta = 0; // 각 시작 기준에서 측정한 회전각. 기준을 바꾸면 모형/그래프/값을 함께 초기화한다.
+let playing = true;
+let speed = 1;
+let areaMode = 'signed';
+let conventionMode = 'plane'; // plane: 면과 B 나란한 시점(0°), normal: 면과 B 수직인 시점(0°)
+let showCos = true;
+let showDerivative = true;
+let previous = performance.now();
+const basicAngularSpeed = 0.84;
+// 한 시점에서 물리적 고리 방향·자기선속·유도전류가 일치하도록 공통 함수 사용.
+// 내부 회전각 γ=0이면 고리 면과 B가 평행, γ=π/2이면 고리 면이 B에 수직.
+const physicalAngle = a => a + (conventionMode==='normal' ? Math.PI/2 : 0);
+const fluxAt = a => Math.sin(physicalAngle(a));
+const derivativeAt = a => basicAngularSpeed*speed*Math.cos(physicalAngle(a));
+const currentAt = a => -derivativeAt(a);
+const formula = () => conventionMode==='plane'?'sinθ':'cosα';
+const diffFormula = () => conventionMode==='plane'?'d(sinθ)/dt':'d(cosα)/dt';
+
+function resize() {
+  for(const canvas of canvases) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1,Math.round(rect.width*dpr));
+    canvas.height = Math.max(1,Math.round(rect.height*dpr));
+    const ctx=canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  redraw();
+}
+function canvasSize(id) {const el=$(id);return [el.clientWidth,el.clientHeight];}
+function line(ctx,x1,y1,x2,y2,stroke='#000',lw=1) {
+  ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+}
+function poly(ctx,pts,fill,stroke,lw=1){
+  ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();
+  if(fill){ctx.fillStyle=fill;ctx.fill();}
+  if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke();}
+}
+function text(ctx,str,x,y,size=12,fill=color.ink,align='left',weight=500){
+  ctx.fillStyle=fill;ctx.font=`${weight} ${size}px "Malgun Gothic",system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillText(str,x,y);
+}
+function arrow(ctx,x1,y1,x2,y2,fill=color.muted,lw=2,head=8){
+  line(ctx,x1,y1,x2,y2,fill,lw);
+  const a=Math.atan2(y2-y1,x2-x1);
+  poly(ctx,[[x2,y2],[x2-head*Math.cos(a-.46),y2-head*Math.sin(a-.46)],[x2-head*Math.cos(a+.46),y2-head*Math.sin(a+.46)]],fill);
+}
+// 수업 좌표는 (x=회전축, y=자기장, z=나머지 수직 방향)이다.
+// 렌더링 내부 좌표 배열은 편의상 (자기장, 수직 방향, 회전축) = (수업 y, 수업 z, 수업 x) 순서.
+// x축 자기장과 z축 회전축은 직교한다. 카메라 위치는
+// 회전축(+z)으로부터 N극 쪽(-x)으로 수평 방위각 15° 이동하며,
+// 높이(카메라 고도)는 0°이므로 위에서 내려다보는 회전이 아니다.
+// 면 기준: θ=0이면 코일 면과 B가 평행하여 Φ=0, θ=90°이면 수직이어서 Φ=+BA.
+// 법선 기준: α=0이면 코일 면과 B가 수직이어서 Φ=+BA, α=90°이면 평행해 Φ=0.
+// 두 기준은 같은 물리 회전을 90° 다른 시작 위치에서 보여준다.
+function drawMain() {
+  const ctx=C.mainCanvas,[w,h]=canvasSize('mainCanvas');
+  ctx.clearRect(0,0,w,h);
+  if(w<10||h<10)return;
+
+  const cx=w*.5,cy=h*.52;
+  const magnetW=Math.min(74,Math.max(48,w*.105));
+  const magnetH=Math.min(124,Math.max(75,h*.59));
+  const offset=Math.min(w*.36,226);
+  const leftX=cx-offset,rightX=cx+offset;
+  const magnetTop=cy-magnetH/2;
+
+  // 일정한 자기장 B: x 방향. 도선과 회전축을 뒤에서 지나가도록 먼저 그린다.
+  for(const s of [-.75,-.37,0,.37,.75]) {
+    const yy=cy+s*Math.min(78,h*.27);
+    arrow(ctx,leftX+magnetW*.57,yy,rightX-magnetW*.57,yy,'#a9c7e3',1.65,6.5);
+  }
+  text(ctx,'자기장 B  →',cx,18,12,'#527ba0','center',700);
+  text(ctx,'회전축 ⟂ 자기장 (90°)',cx,36,11,'#087e75','center',700);
+
+  function drawMagnet(x,letter,fill,stroke) {
+    ctx.fillStyle=fill;
+    ctx.beginPath();ctx.roundRect(x-magnetW/2,magnetTop,magnetW,magnetH,7);ctx.fill();
+    ctx.strokeStyle=stroke;ctx.lineWidth=1.4;ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.15)';
+    ctx.fillRect(x-magnetW/2+5,magnetTop+6,Math.max(3,magnetW*.12),magnetH-12);
+    text(ctx,letter,x,cy,29,'#fff','center',800);
+  }
+  drawMagnet(leftX,'N','#ea6265','#c6494d');
+  drawMagnet(rightX,'S','#4a80e5','#2d63be');
+
+  const cameraYaw=15*Math.PI/180; // 좌측 방위각 15°, 고도 0°
+  const cosYaw=Math.cos(cameraYaw),sinYaw=Math.sin(cameraYaw);
+  // 실제 한 변 길이를 공유: 정사각형 고리이므로 회전축 방향과 수직 방향의 변 길이가 같다.
+  // 15° 카메라에서는 회전축 방향 변이 원근상 짧아 보이지만 물리적 길이는 동일하다.
+  const halfSide=Math.min(92,w*.16,h*.33);
+  const halfZ=halfSide,halfV=halfSide;
+  // 관찰 방향: (-sin(15°),0,cos(15°)). 화면 가로 방향은 (cos(15°),0,sin(15°)).
+  // 수직 투영에 y항만 포함하고, x의 세로 기여를 0으로 놓아 위/아래 각도를 없앤다.
+  const project=([x,y,z])=>[cx+x*cosYaw+z*sinYaw,cy-y];
+
+  // 면의 폭 방향 v=(cosγ,sinγ,0), 축 방향=(0,0,1).
+  // 모든 점은 ±v ± z로 이루어지며 자기장과 회전축의 수직 관계는 유지된다.
+  const gamma=physicalAngle(theta);
+  const v=[Math.cos(gamma)*halfV,Math.sin(gamma)*halfV,0];
+  const z=[0,0,halfZ];
+  const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+  const neg=a=>a.map(n=>-n);
+  const corners=[add(v,z),add(v,neg(z)),add(neg(v),neg(z)),add(neg(v),z)];
+  const points=corners.map(project);
+
+  // 회전축(z축) 보조선: 뷰가 축 정면에 가까워서 화면에는 짧게 투영된다.
+  // 90° 관계는 실제 3차원 좌표에서 유지되며, 화면상 선분 각도만으로 판별하면 안 된다.
+  const axisA=project([0,0,-halfZ-32]),axisB=project([0,0,halfZ+32]);
+  ctx.save();ctx.setLineDash([5,5]);
+  line(ctx,axisA[0],axisA[1],axisB[0],axisB[1],'#138b82',2);
+  ctx.restore();
+
+  // 회전하는 도선의 면과 4개 변. 옆에서 본 15° 폭을 과장하지 않고 그대로 투영한다.
+  poly(ctx,points,'rgba(231,150,45,.22)','#a65f22',2.9);
+  // 가까운 쪽(z>0)과 먼 쪽(z<0)의 세로 변을 구별한다.
+  line(ctx,points[1][0],points[1][1],points[2][0],points[2][1],'#b87935',3.5);
+  line(ctx,points[3][0],points[3][1],points[0][0],points[0][1],'#efad56',4.7);
+  for(const [px,py] of points){
+    ctx.beginPath();ctx.arc(px,py,3.6,0,TAU);ctx.fillStyle='#e6a65d';ctx.fill();
+    ctx.lineWidth=1;ctx.strokeStyle='#96531b';ctx.stroke();
+  }
+
+  // 축 방향 표시: 실제 회전축은 시선과 15°를 이룬다.
+  const nearEnd=project([0,0,halfZ+32]);
+  ctx.beginPath();ctx.arc(nearEnd[0],nearEnd[1],4.1,0,TAU);ctx.fillStyle='#008f81';ctx.fill();
+
+  // 안내: 위쪽에서 바라보는 시점이 아니라 정면에서 수평으로 옆으로 이동한 시점.
+  const phase=((theta%TAU)+TAU)%TAU;
+  const symbol=conventionMode==='plane'?'θ':'α';
+  text(ctx,`${symbol} = ${Math.round(phase*180/Math.PI)}° · 회전축 왼쪽 15° · 고도 0°`,cx,h-26,12,'#3c536c','center',700);
+  text(ctx,'사각 도선의 면을 옆에서 조금 볼 수 있는 관찰 시점',cx,h-10,10,'#6d8197','center');
+}
+function drawProjection(){
+  const ctx=C.projectionCanvas,[w,h]=canvasSize('projectionCanvas');
+  ctx.clearRect(0,0,w,h);
+  if(w<10||h<10)return;
+  const cx=w*.5,cy=h*.46;
+  // 1번과 같은 '정사각형 도선'을 자기장 방향에서 본 정사영.
+  // x축(회전축) 길이와 회전하는 변의 길이가 같으므로 최대 투영 면적은 정사각형.
+  const squareSide=Math.min(180,w*.44,h*.59);
+  const fullW=squareSide,fullH=squareSide;
+  const signed=fluxAt(theta);
+  const projectedHeight=fullH*Math.abs(signed);
+  const areaPct=Math.abs(signed)*100;
+
+  // 바깥 점선: 실제 도선의 전체 면적 A
+  ctx.setLineDash([6,5]);
+  ctx.strokeStyle='#a4b6c9';
+  ctx.lineWidth=2;
+  ctx.strokeRect(cx-fullW/2,cy-fullH/2,fullW,fullH);
+  ctx.setLineDash([]);
+
+  // 회전축은 가로로 고정
+  line(ctx, cx-fullW/2-12, cy, cx+fullW/2+12, cy, 'rgba(90,110,135,.35)', 1.4);
+  text(ctx,'회전축',cx+fullW/2+26,cy,11,'#64768b','left',700);
+
+  // 투영 면적: 회전축에 평행한 가로 길이는 일정, 세로 길이만 |sinγ|에 따라 변함
+  const ink=signed>=0?color.blue:color.red;
+  ctx.fillStyle=signed>=0?'rgba(49,103,216,.23)':'rgba(216,75,75,.23)';
+  ctx.fillRect(cx-fullW/2, cy-projectedHeight/2, fullW, projectedHeight);
+  ctx.strokeStyle=ink;
+  ctx.lineWidth=4;
+  ctx.strokeRect(cx-fullW/2, cy-projectedHeight/2, fullW, projectedHeight);
+
+  text(ctx,`투영 면적 비율  ${areaPct.toFixed(0)}%`,cx,24,14,color.ink,'center',800);
+  text(ctx,'점선: 도선의 원래 정사각형 면 (100%)',cx,h-38,11,'#64768b','center');
+  text(ctx,signed<0?'면의 방향이 반대로 바뀐 상태':'자기장에 수직한 투영 면적',cx,h-19,11,signed<0?color.red:color.blue,'center',650);
+}
+
+function drawGraphAxes(ctx,left,top,gw,gh,yMax,yMin,yticks) {
+  ctx.strokeStyle=color.grid;ctx.lineWidth=1;
+  for(const yval of yticks){
+    const yy=top+(yMax-yval)/(yMax-yMin)*gh;
+    line(ctx,left,yy,left+gw,yy,yval===0?'#9db1c9':color.grid,yval===0?1.5:1);
+    text(ctx,String(yval).replace(/\.0$/,''),left-9,yy,10,'#697c91','right');
+  }
+  for(const i of [0,1,2,3,4]){
+    const xx=left+(i/4)*gw;
+    line(ctx,xx,top,xx,top+gh,'#edf2f7',1);
+    const labels=conventionMode==='plane'?['T/4','T/2','3T/4','T','5T/4']:['0','T/4','T/2','3T/4','T'];
+    text(ctx,labels[i],xx,top+gh+17,11,'#6b7d92','center');
+  }
+  line(ctx,left,top,left,top+gh,'#71859e',1.1);
+  line(ctx,left,top+gh,left+gw,top+gh,'#71859e',1.1);
+}
+function chart(ctx,w,h,opt) {
+  const left=45,right=18,top=22,bottom=34;
+  const gw=Math.max(10,w-left-right),gh=Math.max(10,h-top-bottom);
+  drawGraphAxes(ctx,left,top,gw,gh,opt.yMax,opt.yMin,opt.yticks);
+  const Y=v=>top+(opt.yMax-v)/(opt.yMax-opt.yMin)*gh;
+  ctx.beginPath();ctx.strokeStyle=opt.stroke;ctx.lineWidth=3;
+  for(let i=0;i<=300;i++){
+    const a=TAU*i/300;const x=left+gw*i/300,y=Y(opt.f(a));
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  const phase=((theta%TAU)+TAU)%TAU,px=left+(phase/TAU)*gw,py=Y(opt.f(phase));
+  ctx.save();ctx.setLineDash([4,4]);line(ctx,px,top,px,top+gh,'#8a9aab',1.3);ctx.restore();
+  ctx.beginPath();ctx.fillStyle=opt.stroke;ctx.arc(px,py,5.5,0,TAU);ctx.fill();
+  ctx.beginPath();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.arc(px,py,5.5,0,TAU);ctx.stroke();
+  text(ctx,opt.title,left+6,12,12,opt.stroke,'left',750);
+  text(ctx,'시간 →',left+gw-1,h-9,10,'#6b7d92','right');
+}
+function drawCurrent(){
+  const ctx=C.currentCanvas,[w,h]=canvasSize('currentCanvas');
+  ctx.clearRect(0,0,w,h);if(w<10||h<10)return;
+  chart(ctx,w,h,{yMax:2.1,yMin:-2.1,yticks:[-2,-1,0,1,2],stroke:'#dc8122',
+    title:conventionMode==='plane'?'I ∝ −ω cosθ  (방향 포함)':'I ∝ +ω sinα  (방향 포함)',f:a=>currentAt(a)});
+}
+// ④ 화면에는 두 개의 독립된 곡선을 같은 좌표 위에 겹쳐 그린다.
+// 공통 fluxAt(a)의 시간 미분을 보라색으로 표시한다.
+// 면 기준은 sinθ, 법선 기준은 cosα. 전류 그래프는 보라색 미분을 부호 반전한 것.
+// '크기만' 선택은 초록색 투영 면적에만 적용하며 보라색은 방향을 포함한 변화율.
+function drawArea(){
+  const ctx=C.areaCanvas,[w,h]=canvasSize('areaCanvas');
+  ctx.clearRect(0,0,w,h);if(w<10||h<10)return;
+  const signed=fluxAt(theta),abs=Math.abs(signed);
+
+  // 상단 면적 막대는 항상 실제 투영 면적의 비율 |Φ|/(BA)을 표현한다.
+  const barX=54,barY=9,barWidth=Math.max(30,w-193),barHeight=15;
+  ctx.fillStyle='#e5edf7';ctx.fillRect(barX,barY,barWidth,barHeight);
+  ctx.fillStyle='#3f87d5';ctx.fillRect(barX,barY,barWidth*abs,barHeight);
+  text(ctx,'0%',barX-7,barY+barHeight/2,10,'#7d8b9b','right');
+  text(ctx,'100%',barX+barWidth+7,barY+barHeight/2,10,'#7d8b9b','left');
+  text(ctx,`${(abs*100).toFixed(0)}%`,w-14,barY+barHeight/2,12,color.blue,'right',800);
+
+  // 좌측 축은 실제 면적비 / 방향 포함 선속비 (최대 ±100%).
+  // 우측 축은 변화율 (/s)을 독립적으로 읽는다. 2배속까지 ±2/s 범위 확보.
+  const left=65,right=61,top=52,bottom=34;
+  const gw=Math.max(10,w-left-right),gh=Math.max(10,h-top-bottom);
+  const fluxMax=1.08, derivativeMax=2.16;
+  const areaY=v=>top+(fluxMax-v)/(2*fluxMax)*gh;
+  const derivativeY=v=>top+(derivativeMax-v)/(2*derivativeMax)*gh;
+  ctx.strokeStyle=color.grid;ctx.lineWidth=1;
+  for(const val of [-1,-.5,0,.5,1]) {
+    const yy=areaY(val);
+    line(ctx,left,yy,left+gw,yy,val===0?'#9db1c9':color.grid,val===0?1.5:1);
+    text(ctx,`${val*100}%`,left-8,yy,10,color.teal,'right');
+    text(ctx,`${val*2}/s`,left+gw+9,yy,10,'#9460d3','left');
+  }
+  const labels=conventionMode==='plane'?['T/4','T/2','3T/4','T','5T/4']:['0','T/4','T/2','3T/4','T'];
+  for(let i=0;i<=4;i++) {
+    const xx=left+gw*i/4;
+    line(ctx,xx,top,xx,top+gh,'#edf2f7',1);
+    text(ctx,labels[i],xx,top+gh+17,11,'#6b7d92','center');
+  }
+  line(ctx,left,top,left,top+gh,'#71859e',1.1);
+  line(ctx,left,top+gh,left+gw,top+gh,'#71859e',1.1);
+  const phase=((theta%TAU)+TAU)%TAU;
+  const px=left+(phase/TAU)*gw;
+
+  // 두 그래프가 보이는 경우 현재 회전각 표시선은 하나만 공유.
+  ctx.save();ctx.setLineDash([4,4]);
+  line(ctx,px,top,px,top+gh,'#899cae',1.4);
+  ctx.restore();
+
+  function plot(f,stroke,yPosition){
+    ctx.beginPath();ctx.strokeStyle=stroke;ctx.lineWidth=2.8;
+    for(let i=0;i<=360;i++){
+      const a=TAU*i/360;
+      const x=left+(i/360)*gw,y=yPosition(f(a));
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.beginPath();ctx.arc(px,yPosition(f(phase)),5,0,TAU);
+    ctx.fillStyle=stroke;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.6;ctx.stroke();
+  }
+  if(showCos){
+    plot(a=>areaMode==='signed'?fluxAt(a):Math.abs(fluxAt(a)),color.teal,areaY);
+  }
+  if(showDerivative){
+    plot(a=>derivativeAt(a),'#9460d3',derivativeY);
+  }
+  text(ctx,'시간 →',left+gw-1,h-8,10,'#6b7d92','right');
+  // 그래프와 상단 막대 사이에 현재 값을 표시한다.
+  const shownRatio=areaMode==='signed'?signed:abs;
+  text(ctx,`${areaMode==='signed'?formula():`|${formula()}|`}: ${(shownRatio*100).toFixed(0)}%    ${diffFormula()}: ${derivativeAt(theta).toFixed(2)}/s`,
+       left,top-16,11,'#536981','left',650);
+  if(!showCos&&!showDerivative)text(ctx,'표시 중인 곡선이 없습니다',left+gw/2,top+gh/2,13,'#71839a','center');
+}
+function updateLabels(){
+  const phase=((theta%TAU)+TAU)%TAU;
+  const deg=phase*180/Math.PI;
+  const flux=fluxAt(theta);
+  const current=currentAt(theta);
+  const shownFlux=Math.abs(flux)<1e-10?0:flux;
+  const shownCurrent=Math.abs(current)<1e-10?0:current;
+  $('angleText').textContent=`${Math.round(deg)}°`;
+  $('angleSlider').value=String(Math.round(deg));
+  $('angleValue').textContent=`${Math.round(deg)}°`;
+  $('areaValue').textContent=`${(Math.abs(flux)*100).toFixed(0)}%`;
+  $('fluxValue').textContent=(shownFlux>0?'+':'')+(shownFlux*100).toFixed(0)+'%';
+  $('currentValue').textContent=(shownCurrent>=0?'+':'')+shownCurrent.toFixed(2);
+}
+function redraw(){updateLabels();drawMain();drawProjection();drawCurrent();drawArea();}
+function setPlaying(value){playing=value;$('playBtn').textContent=playing?'❚❚ 일시정지':'▶ 재생';}
+$('playBtn').addEventListener('click',()=>setPlaying(!playing));
+$('resetBtn').addEventListener('click',()=>{theta=0;setPlaying(false);redraw();});
+// 버튼을 누른 바로 그 시점의 회전각에 45°를 더한다(현재 각도 + π/4).
+// 사용자가 변화를 비교할 수 있도록 자동 재생은 잠시 멈추고 위치를 고정한다.
+$('step45Btn').addEventListener('click',()=>{
+  setPlaying(false);
+  theta=(theta+Math.PI/4)%TAU;
+  redraw();
+});
+$('speedSlider').addEventListener('input',e=>{speed=Number(e.target.value);$('speedText').textContent=speed.toFixed(1)+'배';redraw();});
+$('angleSlider').addEventListener('input',e=>{setPlaying(false);theta=Number(e.target.value)*Math.PI/180;redraw();});
+function updateFormulaLabels(){
+  const normal=conventionMode==='normal';
+  $('cosLegend').textContent=areaMode==='signed'?formula():`|${formula()}|`;
+  $('derivativeLegend').textContent=diffFormula();
+  $('angleCaption').textContent=normal?'법선 기준 회전각 α':'도선 면 기준 회전각 θ';
+  $('areaCaption').textContent=`실제 투영 면적 비율 |${formula()}|`;
+  $('fluxValue').parentElement.querySelector('small').textContent=`자기선속 최대값 대비 비율 ${formula()}`;
+  $('currentHint').textContent=normal?'I ∝ +ωsinα · 저항 일정 · 방향 포함':'I ∝ −ωcosθ · 저항 일정 · 방향 포함';
+  $('graphHint').textContent=normal?'자기선속 최대인 0°에서 시작 · 도선 넓이 일정':'자기선속 0인 기존 T/4에서 시작 · 도선 넓이 일정';
+  $('footerText').textContent=normal
+    ? 'x: 회전축 · y: 자기장 · z: 나머지 수직 방향 | 법선 기준 α=0°는 도선 면이 자기장과 수직인 상태 · Φ/BA=cosα · I∝−dΦ/dt (저항 일정, 자체 유도 무시)'
+    : 'x: 회전축 · y: 자기장 · z: 나머지 수직 방향 | 도선 면 기준 θ=0°는 면이 자기장과 평행한 상태 · Φ/BA=sinθ · I∝−dΦ/dt (저항 일정, 자체 유도 무시)';
+}
+$('conventionMode').addEventListener('change',e=>{
+  conventionMode=e.target.value;
+  theta=0; // 서로 다른 물리적 시작 위치를 명확히 비교하도록 전 영역을 같은 0°로 초기화.
+  setPlaying(false);
+  updateFormulaLabels();redraw();
+});
+$('areaMode').addEventListener('change',e=>{
+  areaMode=e.target.value;
+  updateFormulaLabels();redraw();
+});
+function updateGraphSwitch(buttonId,statusId,on){
+  const b=$(buttonId);
+  b.classList.toggle('active',on);
+  b.setAttribute('aria-pressed',String(on));
+  $(statusId).textContent=on?'ON':'OFF';
+}
+$('toggleCos').addEventListener('click',()=>{
+  showCos=!showCos;updateGraphSwitch('toggleCos','cosStatus',showCos);redraw();
+});
+$('toggleDerivative').addEventListener('click',()=>{
+  showDerivative=!showDerivative;updateGraphSwitch('toggleDerivative','derivativeStatus',showDerivative);redraw();
+});
+function frame(now) {
+  const dt=Math.min(Math.max((now-previous)/1000,0),.06);previous=now;
+  if(playing){theta=(theta+basicAngularSpeed*speed*dt)%TAU;redraw();}
+  requestAnimationFrame(frame);
+}
+new ResizeObserver(resize).observe(document.querySelector('.dashboard'));
+window.addEventListener('resize',resize);
+resize();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
