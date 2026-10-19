@@ -280,7 +280,6 @@ function drawMain() {
   arrow(ctx, cx, cy, poleN[0], poleN[1], '#7b8794', 1.6, 6);
   poleBadge(poleN,'N','#ef6b6f','#c6494d');
   poleBadge(poleS,'S','#4a80e5','#2d63be');
-  text(ctx, '유도 자기장에 의한 극', rightX-14, magnetTop-12, 11, '#5b6c81', 'right', 750);
 
   // 안내: 위쪽에서 바라보는 시점이 아니라 정면에서 수평으로 옆으로 이동한 시점.
   const phase=((theta%TAU)+TAU)%TAU;
